@@ -1,0 +1,329 @@
+import AppKit
+import SwiftUI
+import AgentHUDCore
+
+/// Small activity ring with an explicit color for both window and island backgrounds.
+struct LoadingSpinner: View {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.75)
+            .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .padding(1)
+            .keyframeAnimator(initialValue: 0.0, repeating: !reduceMotion) { content, angle in
+                content.rotationEffect(.degrees(angle))
+            } keyframes: { _ in
+                LinearKeyframe(360, duration: 0.9)
+            }
+            .frame(width: 12, height: 12)
+    }
+}
+
+struct SegmentOption<Value: Hashable>: Identifiable {
+    let value: Value
+    let label: String
+    var id: Value { value }
+}
+
+/// Pill segmented control: 12 px labels, selected segment gets the raised background.
+struct SegmentedPills<Value: Hashable>: View {
+    let options: [SegmentOption<Value>]
+    @Binding var selection: Value
+    let theme: Theme
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options) { option in
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(.ui(12))
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(option.value == selection ? theme.segmentSelected : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(option.value == selection ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 7).fill(theme.segmentBackground))
+        .foregroundStyle(theme.text)
+    }
+}
+
+/// A native popup with an explicit size and leading text alignment.
+struct SelectionMenu<Value: Hashable>: NSViewRepresentable {
+    let title: String
+    let options: [SegmentOption<Value>]
+    @Binding var selection: Value
+    let theme: Theme
+    var width: CGFloat = 135
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: 11)
+        button.alignment = .left
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.select(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.parent = self
+        let labels = options.map(\.label)
+        if button.itemTitles != labels {
+            button.removeAllItems()
+            button.addItems(withTitles: labels)
+        }
+        if let index = options.firstIndex(where: { $0.value == selection }), button.indexOfSelectedItem != index {
+            button.selectItem(at: index)
+        }
+        button.contentTintColor = NSColor(theme.text)
+        button.setAccessibilityLabel(title)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
+        CGSize(width: width, height: 22)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var parent: SelectionMenu
+        init(_ parent: SelectionMenu) { self.parent = parent }
+
+        @objc func select(_ sender: NSPopUpButton) {
+            let index = sender.indexOfSelectedItem
+            guard parent.options.indices.contains(index) else { return }
+            parent.selection = parent.options[index].value
+        }
+    }
+}
+
+/// Spacious settings row with trailing native controls.
+public struct SettingRow<Control: View>: View {
+    let label: String
+    var subtitle: String? = nil
+    /// A word set beside the label, such as 实验 / Experimental for a setting still being tried.
+    var tag: String? = nil
+    @ViewBuilder let control: () -> Control
+    @Environment(\.colorScheme) private var scheme
+    @Environment(WindowSurface.self) private var surface: WindowSurface?
+
+    public init(label: String, subtitle: String? = nil, tag: String? = nil,
+                @ViewBuilder control: @escaping () -> Control) {
+        self.label = label
+        self.subtitle = subtitle
+        self.tag = tag
+        self.control = control
+    }
+
+    public var body: some View {
+        HStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(label)
+                    if let tag { SettingTag(text: tag) }
+                }
+                if let subtitle {
+                    // The window's grey on the ground its screen's look gives it, a grade darker on light glass, as the
+                    // section's subtitle is (`Theme.under(_:)`).
+                    Text(subtitle).font(.ui(11)).foregroundStyle(Theme.forScheme(scheme).under(surface?.look).secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            control().fixedSize()
+        }
+        .frame(minHeight: 30)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+    }
+}
+
+/// The word beside a setting's label (`SettingRow.tag`): small and grey in a capsule, read with the label, the grey the
+/// row's subtitle has.
+struct SettingTag: View {
+    let text: String
+    @Environment(\.colorScheme) private var scheme
+    @Environment(WindowSurface.self) private var surface: WindowSurface?
+
+    var body: some View {
+        Text(text)
+            .font(.ui(10, .medium))
+            .foregroundStyle(Theme.forScheme(scheme).under(surface?.look).secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1.5)
+            .background(.quaternary, in: Capsule())
+            .fixedSize()
+    }
+}
+
+/// Native slider and value, aligned with the other grouped settings rows.
+struct SliderRow: View {
+    let label: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let format: (Double) -> String
+    let theme: Theme
+    @State private var pendingValue: Double?
+
+    var body: some View {
+        let displayedValue = pendingValue ?? value
+        HStack(spacing: 12) {
+            Text(label).frame(width: 150, alignment: .leading)
+            Slider(value: Binding(get: { pendingValue ?? value }, set: { pendingValue = $0 }), in: range, step: step)
+                .tint(Color.accentColor)
+                .controlSize(.small)
+                .accessibilityLabel(label)
+                .accessibilityValue(format(displayedValue))
+            Text(format(displayedValue))
+                .font(.tabular(13))
+                .foregroundStyle(theme.secondary)
+                .frame(width: 60, alignment: .trailing)
+        }
+        .frame(minHeight: 30)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .task(id: pendingValue) {
+            guard let next = pendingValue else { return }
+            // Keep dragging local to this row; apply only after input has settled.
+            do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+            value = next
+            pendingValue = nil
+        }
+        .onChange(of: value) { pendingValue = nil }
+        .onDisappear {
+            // Leaving the pane must not discard the user's final adjustment.
+            if let pendingValue { value = pendingValue; self.pendingValue = nil }
+        }
+    }
+}
+
+/// Filled blue action button ("开始使用").
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.ui(13, .semibold))
+            .foregroundStyle(Color.white)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 18)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color(hex: 0x0a84ff)))
+            .opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+
+struct CardModifier: ViewModifier {
+    let theme: Theme
+    var padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
+    var radius: CGFloat = 10
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .background(RoundedRectangle(cornerRadius: radius).fill(theme.card))
+            .overlay(RoundedRectangle(cornerRadius: radius).stroke(theme.cardBorder, lineWidth: 1))
+    }
+}
+
+/// A box raised off the ground it shows over, a chart's hover details: in a window the window's colour with a hairline
+/// and a shadow, or under the look of the window's screen (`WindowSurface`) the HUD's surface in that look, as a box
+/// raised off the island is in the HUD's (`hud`). Glass is drawn as its stand-in there, the look's own colour, which
+/// sets the box off the glass it stands on: glass laid over glass sees nothing. Solid or a stand-in, the box is drawn
+/// nearly opaque (`drawsRaisedBox`), so that the bars, the grid and the labels beneath it never show through its text.
+/// A box the desktop shows through casts no shadow, which would darken it.
+struct RaisedBoxModifier: ViewModifier {
+    let theme: Theme
+    /// The HUD's look, for a box raised off the island, which takes the HUD's raised surface; nil for one in a window.
+    var hud: HUDLook?
+    @Environment(WindowSurface.self) private var surface: WindowSurface?
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 8), look = hud ?? surface?.look
+        content
+            .background {
+                if let look {
+                    HUDSurface(shape, look: look, fill: hud == nil ? theme.windowBackground : theme.raisedSurface,
+                               contact: nil)
+                        .environment(\.drawsGlassStandIn, true)
+                        .environment(\.drawsRaisedBox, true)
+                } else {
+                    shape.fill(theme.windowBackground)
+                }
+            }
+            .overlay(shape.stroke(theme.cardBorder))
+            .shadow(color: .black.opacity(look?.seeThrough == true ? 0 : 0.2), radius: 6, y: 2)
+    }
+}
+
+/// A link drawn on a ground the desktop shows through: the theme's main ink, underlined, dimmed while pressed.
+private struct SeeThroughLinkStyle: ButtonStyle {
+    let theme: Theme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(theme.link)
+            .underline()
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .contentShape(Rectangle())
+    }
+}
+
+extension View {
+    /// The button as a link on `theme`'s ground: the system's link style on an opaque ground, and on one the desktop
+    /// shows through, whose ground the system's blue can match, the main ink underlined (`Theme.link`).
+    @ViewBuilder
+    func themedLink(_ theme: Theme) -> some View {
+        if theme.isSeeThrough {
+            buttonStyle(SeeThroughLinkStyle(theme: theme))
+        } else {
+            buttonStyle(.link)
+        }
+    }
+
+    func card(_ theme: Theme, padding: EdgeInsets = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16), radius: CGFloat = 10) -> some View {
+        modifier(CardModifier(theme: theme, padding: padding, radius: radius))
+    }
+
+    /// Raises the view off the ground it shows over (`RaisedBoxModifier`): a window's, or with `hud` the island's.
+    func raisedBox(_ theme: Theme, hud: HUDLook? = nil) -> some View {
+        modifier(RaisedBoxModifier(theme: theme, hud: hud))
+    }
+
+    /// 1 px line along the top edge (CSS `border-top`). It sits under the content, so anything the section floats
+    /// above its own top, such as a chart's hover box, covers the line instead of being crossed by it.
+    func topDivider(_ color: Color) -> some View {
+        background(alignment: .top) { Rectangle().fill(color).frame(height: 1) }
+    }
+}
+
+extension SettingsStore {
+    /// Two-way binding into one `Settings` field, as the app draws it: an agent's unsaved draft of the app's settings
+    /// drawn over what is saved (`effectiveSettings`). A person's edit drops that field of the draft first, so a person
+    /// always wins, and is made to the settings as saved (`updateSetting(_:_:)`).
+    func binding<T: Equatable>(_ keyPath: WritableKeyPath<AgentHUDCore.Settings, T>) -> Binding<T> {
+        Binding(
+            get: { self.effectiveSettings[keyPath: keyPath] },
+            set: { value in self.updateSetting(keyPath) { $0[keyPath: keyPath] = value } }
+        )
+    }
+
+    /// Binding for integer settings driven by a `Slider`, as `binding(_:)` reads and writes them.
+    func doubleBinding(_ keyPath: WritableKeyPath<AgentHUDCore.Settings, Int>) -> Binding<Double> {
+        Binding(
+            get: { Double(self.effectiveSettings[keyPath: keyPath]) },
+            set: { value in self.updateSetting(keyPath) { $0[keyPath: keyPath] = Int(value.rounded()) } }
+        )
+    }
+}

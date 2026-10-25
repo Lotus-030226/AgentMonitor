@@ -1,0 +1,15 @@
+Agent Monitor 1.0.0
+
+Agent Monitor includes software from Agent HUD, by jazzenchen and contributors.
+Upstream source: https://github.com/jazzenchen/agent-hud-native-open
+Upstream revision: f1ebd1b7d609fe77e5f328974decdb800ddea995
+
+Copyright 2026 Lotus. Agent Monitor contributions include local monitoring,
+native host integration, localization changes, and the original B1 Dual Orbits artwork.
+
+Agent Monitor contributions use the Apache License, Version 2.0.
+See LICENSE for the license terms and docs/UPSTREAM.md for the modification summary.
+
+Third-party code and assets retain their separate license terms.
+See THIRD_PARTY_NOTICES.txt and the license files in the application resources.
+The extracted Clawd sprite resource is excluded from Agent Monitor distributions.

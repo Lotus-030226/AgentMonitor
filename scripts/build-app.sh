@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Modified by Lotus for Agent Monitor. See docs/UPSTREAM.md.
+# Build a locally signed macOS application from source.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CONFIG="${1:-debug}"
+case "$CONFIG" in debug|release) ;; *) echo "Usage: $0 [debug|release]" >&2; exit 2;; esac
+APP_NAME="Agent Monitor"
+APP_DIR="$ROOT/build/$APP_NAME.app"
+MIN_MACOS=14.0
+BUILD_FLAGS=(-c "$CONFIG")
+if [[ -n "${SWIFT_SCRATCH_PATH:-}" ]]; then BUILD_FLAGS+=(--scratch-path "$SWIFT_SCRATCH_PATH"); fi
+"$ROOT/scripts/swift-project.sh" build "${BUILD_FLAGS[@]}" --product AgentMonitor >&2
+BIN_DIR="$("$ROOT/scripts/swift-project.sh" build "${BUILD_FLAGS[@]}" --show-bin-path)"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+cp "$BIN_DIR/AgentMonitor" "$APP_DIR/Contents/MacOS/$APP_NAME"
+# Swift 6.4's default build system stamps LC_BUILD_VERSION's sdk field with the deployment target instead of
+# the SDK actually compiled against. AppKit reads that field to decide whether an app gets the macOS 26
+# control design, so the field is set to the SDK the build used; one stamped right already stays as it was.
+xcrun vtool -set-build-version macos "$MIN_MACOS" "$(xcrun --sdk macosx --show-sdk-version)" -replace \
+  -output "$APP_DIR/Contents/MacOS/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME" >&2
+# Include runtime resources only. Test fixtures stay in the build directory.
+for module in AgentHUDDesktop LocalMonitorCore LocalMonitorUI; do
+  bundle="$BIN_DIR/AgentHUDOpen_$module.bundle"
+  if [[ -d "$bundle" ]]; then
+    cp -R "$bundle" "$APP_DIR/Contents/Resources/"
+  elif [[ "$module" == AgentHUDDesktop ]]; then
+    echo "Missing runtime resource bundle: $bundle" >&2
+    exit 1
+  fi
+done
+cp "$ROOT/assets/AppIcon.icns" "$APP_DIR/Contents/Resources/"
+cp "$ROOT/LICENSE" "$APP_DIR/Contents/Resources/LICENSE.txt"
+cp "$ROOT/NOTICE" "$APP_DIR/Contents/Resources/NOTICE.txt"
+cp "$ROOT/THIRD_PARTY_NOTICES.txt" "$APP_DIR/Contents/Resources/THIRD_PARTY_NOTICES.txt"
+cp "$ROOT/docs/UPSTREAM.md" "$APP_DIR/Contents/Resources/UPSTREAM.md"
+cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>Agent Monitor</string>
+  <key>CFBundleExecutable</key><string>Agent Monitor</string>
+  <key>CFBundleIdentifier</key><string>app.lotus.agentmonitor</string>
+  <key>AgentHUDDataDirectory</key><string>Agent Monitor</string>
+  <key>CFBundleIconFile</key><string>AppIcon.icns</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>Agent Monitor</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+</dict></plist>
+PLIST
+printf 'APPL????' > "$APP_DIR/Contents/PkgInfo"
+codesign --force --sign - --identifier app.lotus.agentmonitor "$APP_DIR" >&2
+codesign --verify --deep --strict "$APP_DIR" >&2
+printf '%s\n' "$APP_DIR"

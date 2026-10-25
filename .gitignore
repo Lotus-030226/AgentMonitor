@@ -1,0 +1,64 @@
+# Modified by Lotus for Agent Monitor. See docs/UPSTREAM.md.
+# Swift and Xcode build products
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# Local settings and credentials
+.env
+.env.*
+!.env.example
+*.local.*
+signing/
+*.p8
+*.p12
+*.pfx
+*.key
+*.pem
+*.mobileprovision
+*.provisionprofile
+
+# Local artifacts
+.DS_Store
+*.log
+*.xcarchive/
+*.dmg
+*.ipa
+tmp/
+
+# Local plans and verification evidence
+docs/plans/
+docs/explain/
+.cache/
+
+# Local agent instructions and test fixtures
+AGENTS.md
+CLAUDE.md
+/Tests/
+/tests/
+/.structure-*
+/Sources/AgentHUDDesktop/Resources/clawd-sprites.json
+
+# Upstream release files and local design material
+/.github/
+/updates/
+/Makefile
+/CHANGELOG.md
+/assets/logo-drafts/
+/docs/*
+!/docs/UPSTREAM.md
+!/docs/data-access.md
+
+# Publish only the scripts needed to build or regenerate assets.
+/scripts/*
+!/scripts/build-app.sh
+!/scripts/swift-project.sh
+!/scripts/generate-app-icon.swift
+!/scripts/generate-settings-artwork.py
+
+# Installers are uploaded as release assets.
+/Releases/
+*.zip

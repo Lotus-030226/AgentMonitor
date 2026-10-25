@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="b1-title b1-desc">
+<title id="b1-title">Agent Monitor｜雙軌環</title>
+<desc id="b1-desc">兩條鏡像橢圓軌道以四個透明交點交替穿插，中央有核心，軌道上有一顆小衛星。正式圖示，深藍圓角底板外保留透明邊界。</desc>
+<rect x="64" y="64" width="896" height="896" rx="200" fill="#111B2D"/>
+<g transform="translate(64 64) scale(14)">
+<defs>
+  <mask id="b1-a" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="white"/><circle cx="13.6933" cy="32" r="4.4" fill="black"/><circle cx="50.3067" cy="32" r="4.4" fill="black"/></mask>
+  <mask id="b1-b" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="white"/><circle cx="32" cy="15.9193" r="4.4" fill="black"/><circle cx="32" cy="48.0807" r="4.4" fill="black"/></mask><linearGradient id="b1-blue" x1="12" y1="10" x2="48" y2="53" gradientUnits="userSpaceOnUse"><stop stop-color="#659BFF"/><stop offset="1" stop-color="#477CE7"/></linearGradient><linearGradient id="b1-cyan" x1="44" y1="10" x2="19" y2="53" gradientUnits="userSpaceOnUse"><stop stop-color="#36CED8"/><stop offset="1" stop-color="#14A7BF"/></linearGradient></defs>
+<g mask="url(#b1-a)"><ellipse cx="32" cy="32" rx="25" ry="13.8" transform="rotate(38 32 32)" fill="none" stroke="url(#b1-blue)" stroke-width="3.6"/></g><g mask="url(#b1-b)"><ellipse cx="32" cy="32" rx="25" ry="13.8" transform="rotate(-38 32 32)" fill="none" stroke="url(#b1-cyan)" stroke-width="3.6"/></g><circle cx="32" cy="32" r="4.1" fill="url(#b1-blue)"/><circle cx="19.18" cy="12.92" r="2.55" fill="url(#b1-cyan)"/>
+</g>
+</svg>

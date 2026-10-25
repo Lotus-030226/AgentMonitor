@@ -1,0 +1,135 @@
+import SwiftUI
+import AgentHUDCore
+
+/// One island silhouette on any screen edge. Its two contact corners flare outward; its inward corners are
+/// convex. `rect` includes the flares along the contact edge, outside the core that holds upright content.
+///
+/// With `lift` set the silhouette floats instead: the same core, rounded on every corner and held `lift`
+/// points off the contact edge. `topRadius` is then only the room the flares would have taken, so a floating
+/// panel fills the card a flared one would, and a small floating panel can grow into a large one.
+struct IslandShape: Shape, Animatable {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+    var edge: HUDEdge = .top
+    var lift: CGFloat? = nil
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(topRadius, bottomRadius) }
+        set {
+            topRadius = newValue.first
+            bottomRadius = newValue.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        // Build once against the top edge, then rotate the silhouette into SwiftUI's y-down coordinates.
+        // The view's content never rotates with it.
+        let size = edge.isHorizontal ? rect.size : CGSize(width: rect.height, height: rect.width)
+        let transform: CGAffineTransform
+        switch edge {
+        case .top:
+            transform = CGAffineTransform(translationX: rect.minX, y: rect.minY)
+        case .bottom:
+            transform = CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: rect.maxX, ty: rect.maxY)
+        case .left:
+            transform = CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: rect.minX, ty: rect.maxY)
+        case .right:
+            transform = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: rect.maxX, ty: rect.minY)
+        }
+        return topPath(in: CGRect(origin: .zero, size: size)).applying(transform)
+    }
+
+    private func topPath(in rect: CGRect) -> Path {
+        if let lift {
+            let side = max(0, min(topRadius, rect.width / 2))
+            let core = CGRect(x: rect.minX + side, y: rect.minY + lift,
+                              width: rect.width - 2 * side, height: max(0, rect.height - lift))
+            return Path(roundedRect: core, cornerRadius: max(0, min(bottomRadius, core.width / 2, core.height / 2)),
+                        style: .continuous)
+        }
+        let top = max(0, min(topRadius, rect.width / 2, rect.height / 2))
+        let bottom = max(0, min(bottomRadius, (rect.width - 2 * top) / 2, rect.height - top))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + top, y: rect.minY + top),
+            control: CGPoint(x: rect.minX + top, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + top, y: rect.maxY - bottom))
+        path.addArc(
+            tangent1End: CGPoint(x: rect.minX + top, y: rect.maxY),
+            tangent2End: CGPoint(x: rect.minX + top + bottom, y: rect.maxY),
+            radius: bottom
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - top - bottom, y: rect.maxY))
+        path.addArc(
+            tangent1End: CGPoint(x: rect.maxX - top, y: rect.maxY),
+            tangent2End: CGPoint(x: rect.maxX - top, y: rect.maxY - bottom),
+            radius: bottom
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - top, y: rect.minY + top))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control: CGPoint(x: rect.maxX - top, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Rectangle with square top corners and rounded bottom corners (used for the glow, whose top is off-screen).
+struct BottomRoundedRectangle: Shape, Animatable {
+    var radius: CGFloat
+
+    var animatableData: CGFloat {
+        get { radius }
+        set { radius = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let r = max(0, min(radius, min(rect.width, rect.height) / 2))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addArc(tangent1End: CGPoint(x: rect.maxX, y: rect.maxY), tangent2End: CGPoint(x: rect.maxX - r, y: rect.maxY), radius: r)
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addArc(tangent1End: CGPoint(x: rect.minX, y: rect.maxY), tangent2End: CGPoint(x: rect.minX, y: rect.maxY - r), radius: r)
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// The collapsed island at a hardware notch, drawn black over a light or glass look's surface (`IslandRootView.inksNotch`):
+/// the camera housing and the flares that join it to the screen's edge. Collapsed, it is the whole island, which is then
+/// what the standard island has always been, one with the housing. Open, it stays where the housing is while the look's
+/// surface grows round it, and its black fades out over `feather` points round the housing, so the housing melts into
+/// the surface instead of meeting it at a line.
+struct NotchInk: View {
+    /// The collapsed island's size, its flares included, and its radii.
+    let size: CGSize
+    let topRadius: CGFloat
+    let bottomRadius: CGFloat
+    /// How far the black fades out past the housing's edge.
+    var feather: CGFloat = NotchInk.feather
+
+    /// Enough to soften the housing's edge on a light surface without reading as a shadow under it.
+    static let feather: CGFloat = 14
+
+    var body: some View {
+        let shape = IslandShape(topRadius: topRadius, bottomRadius: bottomRadius)
+        // The fade is the shape grown by half the feather and blurred by as much, so it starts at the housing's edge at
+        // nearly full black and is gone a feather past it; a blur of the shape alone would halve the black at the edge
+        // and leave a step there.
+        ZStack {
+            shape.fill(Color.black)
+            shape.stroke(Color.black, lineWidth: feather)
+        }
+        .frame(width: size.width, height: size.height)
+        .blur(radius: feather / 2)
+        .overlay { shape.fill(Color.black) }
+        .frame(width: size.width, height: size.height)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}

@@ -1,0 +1,112 @@
+// Modified by Lotus for Agent Monitor. See docs/UPSTREAM.md.
+import SwiftUI
+import AgentHUDCore
+
+struct GeneralPane: View {
+    let settings: SettingsStore
+    let theme: Theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            SettingsSection(title: L10n.text("外观与语言", "Appearance & language"), theme: theme) {
+                SettingRow(label: L10n.text("外观", "Appearance")) {
+                    Picker(L10n.text("外观", "Appearance"), selection: settings.binding(\.appearance)) {
+                        Text(L10n.text("跟随系统", "System")).tag(AppearanceMode.system)
+                        Text(L10n.text("浅色", "Light")).tag(AppearanceMode.light)
+                        Text(L10n.text("深色", "Dark")).tag(AppearanceMode.dark)
+                    }
+                    .labelsHidden().pickerStyle(.segmented)
+                    // The windows take their screen's look instead while Match screen is on, an agent's draft of it included.
+                    .disabled(settings.effectiveSettings.appearanceFollowsScreen)
+                }
+                SettingsDivider(theme: theme)
+                SettingsToggleRow(
+                    label: L10n.text("跟随所在屏幕", "Match screen"),
+                    subtitle: L10n.text("每个窗口和菜单栏菜单采用所在屏幕的 HUD 外观、材质和透明度，移到另一块屏幕时跟着变。Clear 玻璃在正在使用的窗口里由系统画得更清透，到了后台才是磨砂。",
+                                        "Each window and the menu-bar menu take the HUD look, material and transparency of the "
+                                            + "screen they are on, and change with it when moved. macOS draws Clear glass sharper "
+                                            + "in the window in use, and frosted once it is in the background."),
+                    tag: L10n.text("实验", "Experimental"),
+                    isOn: settings.binding(\.appearanceFollowsScreen)
+                )
+                SettingsDivider(theme: theme)
+                SettingRow(label: L10n.text("语言", "Language")) {
+                    Picker(L10n.text("语言", "Language"), selection: settings.binding(\.language)) {
+                        Text(L10n.text("跟随系统", "System")).tag(AppLanguage.system)
+                        Text("繁體中文").tag(AppLanguage.zhHant)
+                        Text("简体中文").tag(AppLanguage.zhHans)
+                        Text("English").tag(AppLanguage.en)
+                    }
+                    .labelsHidden().pickerStyle(.menu)
+                }
+            }
+            SettingsSection(title: L10n.text("启动", "Startup"), theme: theme) {
+                SettingsToggleRow(
+                    label: L10n.text("登录时启动", "Launch at login"),
+                    subtitle: L10n.text("登录 Mac 后，自动开始监测用量。", "Keep an eye on usage whenever you start your Mac."),
+                    isOn: settings.binding(\.launchAtLogin)
+                )
+            }
+            SettingsSection(title: L10n.text("客户端", "Clients"), theme: theme) {
+                ClientHooksSetting(settings: settings)
+                SettingsDivider(theme: theme)
+                SettingRow(label: L10n.text("等待回答", "Wait for an answer"),
+                           subtitle: L10n.text("到时没回答的权限请求交还客户端，由它自己询问。",
+                                               "After this, an unanswered permission request goes back to the client's own prompt.")) {
+                    Picker(L10n.text("等待回答", "Wait for an answer"), selection: settings.binding(\.approvalWaitMinutes)) {
+                        ForEach(Settings.approvalWaitChoices, id: \.self) { minutes in
+                            Text(L10n.text("\(minutes) 分钟", minutes == 1 ? "1 minute" : "\(minutes) minutes")).tag(minutes)
+                        }
+                    }
+                    .labelsHidden().pickerStyle(.menu)
+                    .accessibilityIdentifier("general-approval-wait")
+                }
+                .disabled(!settings.settings.clientHooks)
+            }
+        }
+    }
+}
+
+/// Removing the hooks costs features the user may not connect with them, so switching off names each one first.
+private struct ClientHooksSetting: View {
+    let settings: SettingsStore
+    @State private var confirming = false
+
+    var body: some View {
+        SettingRow(label: L10n.text("客户端回调", "Client hooks"),
+                   subtitle: L10n.text("写入各客户端的设置，用来在 HUD 上回答权限请求、显示完成与等待批准。",
+                                       "Added to each client's settings so the HUD can answer permission requests and show completions and waiting.")) {
+            Toggle(L10n.text("客户端回调", "Client hooks"), isOn: Binding(get: {
+                settings.settings.clientHooks && !confirming
+            }, set: { value in
+                if value { settings.update { $0.clientHooks = true } } else { confirming = true }
+            }))
+            .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .accessibilityIdentifier("general-client-hooks")
+        }
+        .alert(L10n.text("移除客户端回调？", "Remove client hooks?"), isPresented: $confirming) {
+            Button(L10n.text("取消", "Cancel"), role: .cancel) {}
+            Button(L10n.text("移除", "Remove"), role: .destructive) { settings.update { $0.clientHooks = false } }
+        } message: {
+            Text(L10n.text(
+                """
+                Agent HUD 会从各客户端的设置中移除自己添加的回调，之后也不再写回。关闭后将失去：
+                · 在 HUD 上回答 Claude Code、Codex、CodeBuddy、WorkBuddy、ZCode、Qwen Code、Qoder 与 Devin CLI 的权限请求
+                · 在 HUD 上回答兼容的 DeepSeek Harness 网页端提问
+                · Antigravity、Cursor、GitHub Copilot CLI、CodeBuddy、Qwen Code、OpenCode 与 Devin CLI 的完成提醒
+                · Claude Code 会话的等待批准状态
+                · Pi 的运行状态与完成提醒
+                用量、额度与会话统计不受影响。重新开启后，Codex 需要在 /hooks 中再次信任。
+                """,
+                """
+                Agent HUD removes the hooks it added to each client's settings and stops adding them back. You lose:
+                • Answering permission requests from Claude Code, Codex, CodeBuddy, WorkBuddy, ZCode, Qwen Code, Qoder and Devin CLI on the HUD
+                • Answering questions from compatible DeepSeek Harness web hosts on the HUD
+                • Completion reminders for Antigravity, Cursor, GitHub Copilot CLI, CodeBuddy, Qwen Code, OpenCode and Devin CLI
+                • The waiting-for-approval state of Claude Code sessions
+                • Running status and completion reminders for Pi
+                Usage, quota and session statistics are unaffected. Turned back on, Codex asks you to trust its hook again in /hooks.
+                """))
+        }
+    }
+}

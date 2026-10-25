@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="b1m-title b1m-desc">
+<title id="b1m-title">Agent Monitor｜雙軌環・單色</title>
+<desc id="b1m-desc">兩條鏡像橢圓軌道以四個透明交點交替穿插，中央有核心，軌道上有一顆小衛星。正式標誌，透明背景。</desc>
+<defs>
+  <mask id="b1m-a" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="white"/><circle cx="13.6933" cy="32" r="4.4" fill="black"/><circle cx="50.3067" cy="32" r="4.4" fill="black"/></mask>
+  <mask id="b1m-b" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="white"/><circle cx="32" cy="15.9193" r="4.4" fill="black"/><circle cx="32" cy="48.0807" r="4.4" fill="black"/></mask></defs>
+<g mask="url(#b1m-a)"><ellipse cx="32" cy="32" rx="25" ry="13.8" transform="rotate(38 32 32)" fill="none" stroke="currentColor" stroke-width="3.6"/></g><g mask="url(#b1m-b)"><ellipse cx="32" cy="32" rx="25" ry="13.8" transform="rotate(-38 32 32)" fill="none" stroke="currentColor" stroke-width="3.6"/></g><circle cx="32" cy="32" r="4.1" fill="currentColor"/><circle cx="19.18" cy="12.92" r="2.55" fill="currentColor"/>
+</svg>
