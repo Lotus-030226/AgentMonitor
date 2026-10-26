@@ -1,3 +1,4 @@
+// Modified by Lotus for Agent Monitor. See docs/UPSTREAM.md.
 import AppKit
 import SwiftUI
 import Observation
@@ -13,7 +14,7 @@ public enum MainWindowPage: String, CaseIterable, Sendable {
         case .docker: "Docker"
         case .localServices: "本機服務"
         case .tokens: "Token"
-        case .sessions: "會話"
+        case .sessions: "對話"
         case .settings: "設定"
         }
     }

@@ -59,11 +59,12 @@ public enum L10n {
     public static func text(_ zh: String, _ en: String) -> String {
         switch resolved {
         case .en: return en
-        case .zhHans: return zh
+        case .zhHans: return zh.replacingOccurrences(of: "会话", with: "对话").replacingOccurrences(of: "會話", with: "对话")
         case .zhHant:
             return state.lock.withLock {
                 if let converted = state.traditional[zh] { return converted }
-                let converted = zh.applyingTransform(StringTransform("Hans-Hant"), reverse: false) ?? zh
+                let converted = (zh.applyingTransform(StringTransform("Hans-Hant"), reverse: false) ?? zh)
+                    .replacingOccurrences(of: "會話", with: "對話")
                 if state.traditional.count >= 2048 { state.traditional.removeAll(keepingCapacity: true) }
                 state.traditional[zh] = converted
                 return converted

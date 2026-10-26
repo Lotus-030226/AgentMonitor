@@ -58,7 +58,7 @@ public final class DesktopApplication {
         self.options = options
         self.settings = settings
         self.store = store
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.0"
         if let updates {
             self.updates = updates
         } else if options.demo || options.probe || options.snapshotDirectory != nil {

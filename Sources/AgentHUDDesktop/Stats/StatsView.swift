@@ -14,8 +14,6 @@ struct StatsView: View {
     @State private var sessionSource: SessionSource?
     @State private var sessionProject: SessionProject?
     @State private var sessionSearch: String
-    /// How the Sessions page lists its sessions: under their days, or those active in the last day without days.
-    @State private var arrangement = SessionArrangement.day
 
     init(store: UsageStore, scrollable: Bool = true, onIdealHeightChange: ((CGFloat) -> Void)? = nil,
          project: SessionProject? = nil, search: String = "", embedded: Bool = false) {
@@ -98,7 +96,7 @@ struct StatsView: View {
                     SessionDetailView(session: session, store: store, theme: theme)
                         .id(session.id)
                 } else {
-                    SessionList(store: store, theme: theme, source: sessionSource, activeOnly: arrangement == .active,
+                    SessionList(store: store, theme: theme, source: sessionSource,
                                 project: sessionProject, search: sessionSearch)
                 }
             }
@@ -178,17 +176,6 @@ struct StatsView: View {
                 .accessibilityIdentifier("session-list-back")
                 Spacer(minLength: 12)
             case .sessions:
-                Picker(L10n.text("排列", "Arrange"), selection: $arrangement.animation(.easeOut(duration: 0.15))) {
-                    Text(L10n.text("按日", "Day")).tag(SessionArrangement.day)
-                    Text(L10n.text("活跃", "Active")).tag(SessionArrangement.active)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .fixedSize()
-                .help(L10n.text("按日期列出近 7 天的会话，或只列近 24 小时有活动的会话、不分日期",
-                                "The last seven days' sessions under their days, or only those active in the last 24 hours, without days"))
-                .accessibilityIdentifier("sessions-arrangement")
                 Spacer(minLength: 12)
                 sessionCount(theme)
                 SelectionMenu(
@@ -205,7 +192,7 @@ struct StatsView: View {
     }
 
     private var sessionSources: [SessionSource] {
-        Array(Set(store.statsSessions.map(store.sessionSource))).sorted {
+        Array(Set(store.runningSessions().map(store.sessionSource))).sorted {
             if $0.vendor != $1.vendor { return ($0.vendor ?? "") < ($1.vendor ?? "") }
             return $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
@@ -232,20 +219,18 @@ struct StatsView: View {
     }
 
     private var sessionProjects: [SessionProject] {
-        var projects = Set(store.statsSessions.map(SessionProject.init))
+        var projects = Set(store.runningSessions().map(SessionProject.init))
         if let sessionProject { projects.insert(sessionProject) }
         return SessionProject.ordered(projects)
     }
 
     private func sessionCount(_ theme: Theme) -> some View {
-        let activeOnly = arrangement == .active
-        let counts = Self.sessionCounts(store, source: sessionSource, activeOnly: activeOnly,
+        let counts = Self.sessionCounts(store, source: sessionSource, activeOnly: true,
                                         project: sessionProject, search: sessionSearch)
-        let listed = counts.listed, running = counts.running
+        let running = counts.running
         return HStack(spacing: 6) {
             Circle().fill(running > 0 ? theme.status(.ok) : theme.tertiary).frame(width: 6, height: 6)
-            Text(activeOnly ? L10n.text("近 24 小时 \(listed) 个 · \(running) 个运行中", "\(listed) in 24 hours · \(running) running")
-                            : L10n.text("近 7 天 \(listed) 个 · \(running) 个运行中", "\(listed) in 7 days · \(running) running"))
+            Text(L10n.text("\(running) 个运行中", "\(running) running"))
         }
         .font(.ui(11))
         .foregroundStyle(theme.secondary)
@@ -254,7 +239,7 @@ struct StatsView: View {
     /// How many sessions the list shows, and how many of them are running.
     static func sessionCounts(_ store: UsageStore, source: SessionSource?, activeOnly: Bool,
                               project: SessionProject? = nil, search: String = "") -> (listed: Int, running: Int) {
-        let sessions = store.listedSessions(source: source, activeOnly: activeOnly, project: project, search: search), view = store.view
+        let sessions = store.runningSessions(source: source, project: project, search: search), view = store.view
         return (sessions.count, sessions.filter { view.phase(of: $0).isInFlight }.count)
     }
 

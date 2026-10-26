@@ -122,8 +122,8 @@ public extension UsageStore {
     /// The hover panel's session rows under a layout's `sessions` (`ReportView.panelSessions(_:vendor:project:)`), each
     /// session's project the one kept for the report (`sessionProject(_:)`).
     func panelSessions(_ filter: PanelSessionFilter = PanelSessionFilter(), vendor: String? = nil,
-                       source: SessionSource? = nil) -> PanelSessionRows {
-        view.panelSessions(filter, vendor: vendor, source: source, project: sessionProject)
+                       source: SessionSource? = nil, runningOnly: Bool = false) -> PanelSessionRows {
+        view.panelSessions(filter, vendor: vendor, source: source, runningOnly: runningOnly, project: sessionProject)
     }
 
     /// The projects the sessions belong to now, which a layout's `sessions.projects` can list

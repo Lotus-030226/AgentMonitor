@@ -5,21 +5,11 @@ import AgentHUDCore
 /// The hover panel's sessions section: which sessions it lists, and each one's row with the way back to its agent, its
 /// questions and its usage.
 extension HoverPanelView {
-    /// What is waiting, running and recently ended: the sessions with work in flight first — those waiting for the
-    /// user ahead of those still running — then those last active in the layout's period, the past day by default, or
-    /// every one by its last event where the layout orders them by date, up to the layout's limit, five by default, of
-    /// the agents, projects and states it lists. The remaining count includes every
-    /// other session the filter keeps in that summary, and a filter that keeps none says so in one line under the
-    /// header. The statistics window's range never applies here — that range belongs to the session card, which
-    /// answers a different question. The header
-    /// opens the session list; each row's title returns to its agent, or opens its session page where the client names
-    /// no destination, and its token count opens usage. Its gaps follow the layout's spacing, and its divider the
-    /// layout's separators. On the panel's picture for an agent a row is named by its place in the list, with no title
-    /// and no project.
+    /// Lists running conversations and approval requests with the selected source and layout filters.
     func sessionLine(_ filter: PanelSessionFilter, hasAbove: Bool, spacing: PanelSpacingMetrics, divider: Color) -> some View {
         let all = Self.sessionRows(store, vendor: focusVendor, filter: filter)
         let selected = panelSessionSource.flatMap { all.sources.contains($0) ? $0 : nil }
-        let rows = store.panelSessions(filter, vendor: focusVendor, source: selected)
+        let rows = store.panelSessions(filter, vendor: focusVendor, source: selected, runningOnly: true)
         let shown = rows.shown, status = Self.sessionStatus(rows)
         return VStack(alignment: .leading, spacing: spacing.sessionRows) {
             HStack(spacing: 8) {
@@ -29,7 +19,7 @@ extension HoverPanelView {
                             .font(.ui(13, .semibold)).foregroundStyle(theme.text)
                         Spacer()
                         // Without a status the line keeps its room, so the header is as tall either way.
-                        Text(status ?? L10n.text("最近结束", "Recently ended"))
+                        Text(status ?? L10n.text("没有运行中的对话", "No running conversations"))
                             .font(.tabular(12)).foregroundStyle(theme.secondary)
                             .opacity(status == nil ? 0 : 1)
                             .accessibilityHidden(status == nil)
@@ -251,29 +241,23 @@ extension HoverPanelView {
         onOpenStats()
     }
 
-    /// The island's summary: local work in flight and sessions last active in the filter's period, the past day by
-    /// default, with waiting before running, newest created first, then the most recently ended, or every one by its
-    /// last event where the filter orders them by date, of the agents, projects and states `filter` keeps and as many as
-    /// it allows (`UsageStore.panelSessions(_:vendor:)`). The full session list holds any hidden rows. `vendor` keeps
-    /// only the sessions of the agents drawn with that vendor's mark, and the filter applies among them.
+    /// Lists work in flight. History stays available through the core panel API.
     static func sessionRows(_ store: UsageStore, vendor: String? = nil,
                             filter: PanelSessionFilter = PanelSessionFilter()) -> PanelSessionRows {
-        store.panelSessions(filter, vendor: vendor)
+        store.panelSessions(filter, vendor: vendor, runningOnly: true)
     }
 
-    /// What the header says beside its name: how many of the listed sessions are in flight, or that those listed have
-    /// ended; nil where the layout's filter keeps none of the sessions there are, which the line under the header says,
-    /// so the header claims no state of sessions it leaves out.
+    /// Counts filtered work in flight. An empty list reports no running conversations.
     static func sessionStatus(_ rows: PanelSessionRows) -> String? {
         guard !rows.noneMatch else { return nil }
-        return rows.running.isEmpty ? L10n.text("最近结束", "Recently ended")
+        return rows.running.isEmpty ? L10n.text("没有运行中的对话", "No running conversations")
             : L10n.text("\(rows.running.count) 个运行中", "\(rows.running.count) running")
     }
 
     /// What the section says without rows: that the layout's filter keeps none of the sessions there are, or that there
     /// are none yet.
     static func emptySessionsLine(_ rows: PanelSessionRows) -> String {
-        rows.noneMatch ? L10n.text("没有符合条件的会话", "No sessions match") : L10n.text("还没有会话", "No sessions yet")
+        rows.noneMatch ? L10n.text("没有符合条件的会话", "No sessions match") : L10n.text("没有运行中的对话", "No running conversations")
     }
 
     /// The vendor's newest session, among those of the past week drawn with its mark, that its client names a

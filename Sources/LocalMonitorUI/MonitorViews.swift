@@ -109,36 +109,47 @@ public struct MonitorDetails: View {
         DesktopSettingsPage(id: section.rawValue, title: { section.rawValue }, subtitle: { subtitle },
                             symbol: symbol, color: .accentColor) { EmptyView() }
     }
+    private var memoryDetail: String {
+        "估計用量 · 共 \(MonitorFormat.bytes(snapshot.memoryTotalBytes)) · \(snapshot.memoryPressure)"
+    }
     private var overview: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 metric("CPU", symbol: "cpu", value: MonitorFormat.percent(snapshot.cpuPercent),
-                       detail: "全系統使用率", color: .cyan, history: cpuHistory, valueColor: MonitorSeverity.cpu(snapshot.cpuPercent))
+                       detail: memoryDetail, color: .cyan, history: cpuHistory, hidesDetail: true, valueColor: MonitorSeverity.cpu(snapshot.cpuPercent))
+                    .accessibilityLabel("全系統 CPU 使用率 \(MonitorFormat.percent(snapshot.cpuPercent))")
                 metric("記憶體", symbol: "memorychip", value: MonitorFormat.bytes(snapshot.memoryUsedBytes),
-                       detail: "估計用量 · 共 \(MonitorFormat.bytes(snapshot.memoryTotalBytes)) · \(snapshot.memoryPressure)", color: .indigo, history: memoryHistory, detailColor: MonitorSeverity.state(snapshot.memoryPressure))
-            }
+                       detail: memoryDetail, color: .indigo, history: memoryHistory, detailColor: MonitorSeverity.state(snapshot.memoryPressure))
+            }.fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 12) {
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("儲存空間", systemImage: "internaldrive").foregroundStyle(.secondary).font(.subheadline)
+                            .overviewFrame("disk.title")
                         Text(MonitorFormat.bytes(snapshot.diskUsedBytes)).font(.system(size: 27, weight: .medium)).monospacedDigit()
+                            .accessibilityLabel("磁碟已用 \(MonitorFormat.bytes(snapshot.diskUsedBytes))")
                         if let ratio = MonitorFormat.ratio(snapshot.diskUsedBytes, snapshot.diskTotalBytes) {
                             ProgressView(value: ratio, total: 100).tint(.teal).accessibilityLabel("磁碟已用比例")
                         } else {
                             Text("使用率尚無資料").font(.caption).foregroundStyle(.secondary)
                         }
-                        Text("已用 / 共 \(MonitorFormat.bytes(snapshot.diskTotalBytes))").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                        Spacer(minLength: 0)
+                        Text("共 \(MonitorFormat.bytes(snapshot.diskTotalBytes))").font(.caption).foregroundStyle(.secondary)
+                            .overviewFrame("disk.footer")
+                    }.frame(maxHeight: .infinity, alignment: .topLeading)
+                }.overviewFrame("disk.card")
                 GlassCard {
-                    VStack(alignment: .leading, spacing: 17) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Label("網路流量", systemImage: "network").foregroundStyle(.secondary).font(.subheadline)
+                            .overviewFrame("network.title")
                         HStack { networkRate("下載", symbol: "arrow.down", value: snapshot.networkReceivedBytesPerSecond, color: .cyan)
                             Spacer(); networkRate("上傳", symbol: "arrow.up", value: snapshot.networkSentBytesPerSecond, color: .indigo) }
+                        Spacer(minLength: 0)
                         Text("所有啟用介面 · 每秒傳輸量").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
+                            .overviewFrame("network.footer")
+                    }.frame(maxHeight: .infinity, alignment: .topLeading)
+                }.overviewFrame("network.card")
+            }.fixedSize(horizontal: false, vertical: true)
             GlassCard {
                 VStack(spacing: 12) {
                     HStack(spacing: 12) {
@@ -159,7 +170,7 @@ public struct MonitorDetails: View {
                     }
                     SettingsDivider()
                     HStack(spacing: 12) {
-                        Label("熱狀態", systemImage: "thermometer.medium")
+                        Label("系統散熱狀態", systemImage: "thermometer.medium")
                             .font(.subheadline.weight(.medium))
                         Spacer()
                         Text(snapshot.thermalState).font(.subheadline)
@@ -181,16 +192,24 @@ public struct MonitorDetails: View {
         }
     }
 
-    private func metric(_ title: String, symbol: String, value: String, detail: String, color: Color, history: [Double], valueColor: Color = .primary, detailColor: Color = .secondary) -> some View {
+    private func metric(_ title: String, symbol: String, value: String, detail: String, color: Color, history: [Double], hidesDetail: Bool = false, valueColor: Color = .primary, detailColor: Color = .secondary) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 12) {
                 Label(title, systemImage: symbol).font(.subheadline).foregroundStyle(.secondary)
+                    .overviewFrame("\(title).title")
                 Text(value).font(.system(size: 36, weight: .medium)).foregroundStyle(valueColor).monospacedDigit().contentTransition(.numericText())
-                Text(detail).font(.caption).foregroundStyle(detailColor).lineLimit(1)
+                    .overviewFrame("\(title).value")
+                Text(detail).font(.caption).foregroundStyle(detailColor)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .opacity(hidesDetail ? 0 : 1).accessibilityHidden(hidesDetail)
+                    .overviewFrame("\(title).detail")
+                Spacer(minLength: 0)
                 Sparkline(values: history, color: color).frame(height: 50)
+                    .overviewFrame("\(title).chart")
                 HStack { Text("最近 \(history.count) 次取樣"); Spacer(); Text("0–100%") }.font(.system(size: 10)).foregroundStyle(.tertiary)
-            }
-        }
+                    .overviewFrame("\(title).footer")
+            }.frame(maxHeight: .infinity, alignment: .topLeading)
+        }.overviewFrame("\(title).card")
     }
     private func networkRate(_ title: String, symbol: String, value: Double?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -257,12 +276,19 @@ public struct LocalMonitorHUDSummary: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.desktopHUDPreviewPresented) private var previewPresented
     private let onOpen: () -> Void
-    private var snapshot: MachineSnapshot { store.snapshot }
-    private let columns = [GridItem(.adaptive(minimum: 108), spacing: 12, alignment: .top)]
+    private let previewSnapshot: MachineSnapshot?
+    private var snapshot: MachineSnapshot { previewSnapshot ?? store.snapshot }
 
     public init(store: LocalMonitorStore, onOpen: @escaping () -> Void) {
         self.store = store
         self.onOpen = onOpen
+        self.previewSnapshot = nil
+    }
+
+    init(store: LocalMonitorStore, previewSnapshot: MachineSnapshot, onOpen: @escaping () -> Void) {
+        self.store = store
+        self.onOpen = onOpen
+        self.previewSnapshot = previewSnapshot
     }
 
     public var body: some View {
@@ -276,20 +302,20 @@ public struct LocalMonitorHUDSummary: View {
                     if !store.isRunning { Text("已暫停").foregroundStyle(.orange) }
                     Image(systemName: "arrow.up.right").foregroundStyle(.secondary)
                 }.font(.system(size: 11))
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                HUDMetricGrid {
                     metric("CPU", symbol: "cpu", value: MonitorFormat.percent(snapshot.cpuPercent),
-                           detail: "全系統使用率", color: cpuWarning(snapshot.cpuPercent))
+                           detail: "", color: cpuWarning(snapshot.cpuPercent))
                     metric("記憶體", symbol: "memorychip", value: MonitorFormat.bytes(snapshot.memoryUsedBytes),
                            detail: "共 \(MonitorFormat.bytes(snapshot.memoryTotalBytes)) · \(known(snapshot.memoryPressure))",
                            color: stateWarning(snapshot.memoryPressure))
                     metric("網路", symbol: "network", value: "↓ \(MonitorFormat.rate(snapshot.networkReceivedBytesPerSecond))",
                            detail: "↑ \(MonitorFormat.rate(snapshot.networkSentBytesPerSecond))")
                     metric("儲存空間", symbol: "internaldrive", value: MonitorFormat.bytes(snapshot.diskUsedBytes),
-                           detail: "已用 / 共 \(MonitorFormat.bytes(snapshot.diskTotalBytes))")
+                           detail: "共 \(MonitorFormat.bytes(snapshot.diskTotalBytes))")
                     metric("電源", symbol: snapshot.isCharging == true ? "battery.100percent.bolt" : "battery.100percent",
                            value: MonitorFormat.percent(snapshot.batteryPercent), detail: powerDetail)
-                    metric("溫度狀態", symbol: "thermometer.medium", value: known(snapshot.thermalState),
-                           detail: "系統散熱狀態", color: stateWarning(snapshot.thermalState))
+                    metric("系統散熱狀態", symbol: "thermometer.medium", value: known(snapshot.thermalState),
+                           detail: "", color: stateWarning(snapshot.thermalState))
                     metric("Docker", symbol: "shippingbox", value: dockerCount, detail: dockerState)
                         .contentShape(Rectangle())
                         .onHover(perform: dockerHover.anchorChanged)
@@ -330,12 +356,12 @@ public struct LocalMonitorHUDSummary: View {
 
     private var accessibleMetrics: String {
         var values = [
-            "CPU \(MonitorFormat.percent(snapshot.cpuPercent))",
+            "全系統 CPU 使用率 \(MonitorFormat.percent(snapshot.cpuPercent))",
             "記憶體 \(MonitorFormat.bytes(snapshot.memoryUsedBytes))，共 \(MonitorFormat.bytes(snapshot.memoryTotalBytes))，壓力 \(known(snapshot.memoryPressure))",
             "下載 \(MonitorFormat.rate(snapshot.networkReceivedBytesPerSecond))，上傳 \(MonitorFormat.rate(snapshot.networkSentBytesPerSecond))",
             "磁碟已用 \(MonitorFormat.bytes(snapshot.diskUsedBytes))，共 \(MonitorFormat.bytes(snapshot.diskTotalBytes))",
             "電池 \(MonitorFormat.percent(snapshot.batteryPercent))，\(powerDetail)",
-            "溫度狀態 \(known(snapshot.thermalState))",
+            "系統散熱狀態 \(known(snapshot.thermalState))",
             "Docker \(snapshot.dockerStatus)，\(dockerCount)",
             "已列程序 \(snapshot.processes.isEmpty ? "—" : String(snapshot.processes.count))"
         ]
@@ -347,7 +373,7 @@ public struct LocalMonitorHUDSummary: View {
     private var powerDetail: String {
         let source = known(snapshot.powerSource)
         guard let charging = snapshot.isCharging else { return source }
-        return charging ? "\(source) · 充電中" : source
+        return charging ? "\(source)\n充電中" : source
     }
     private var dockerState: String {
         snapshot.dockerStatus.hasPrefix("無法取得") ? "無法取得" : snapshot.dockerStatus
@@ -370,16 +396,75 @@ public struct LocalMonitorHUDSummary: View {
     private func known(_ value: String) -> String { value == "無法取得" ? "—" : value }
     private func metric(_ title: String, symbol: String, value: String, detail: String, color: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: symbol).foregroundStyle(.secondary).font(.system(size: 11))
+            HStack(alignment: .top, spacing: 4) {
+                Image(systemName: symbol).frame(width: 13)
+                Text(title).fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.secondary).font(.system(size: 11))
             Group {
                 if let color { Text(value).foregroundStyle(color) }
                 else { Text(value) }
             }
             .font(.system(size: 12, weight: .semibold, design: .rounded)).monospacedDigit()
-            Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
+            if !detail.isEmpty {
+                Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+
+/// Fits equal columns and reserves the same height for each metric row.
+private struct HUDMetricGrid: Layout {
+    private let spacing: CGFloat = 12
+    private let minimumWidth: CGFloat = 84
+
+    private func columns(for width: CGFloat) -> Int {
+        min(4, max(1, Int((width + spacing) / (minimumWidth + spacing))))
+    }
+
+    private func metrics(width: CGFloat, subviews: Subviews) -> (columns: Int, cellWidth: CGFloat, rowHeight: CGFloat) {
+        let count = columns(for: width)
+        let cellWidth = max(0, (width - CGFloat(count - 1) * spacing) / CGFloat(count))
+        let height = subviews.map { $0.sizeThatFits(ProposedViewSize(width: cellWidth, height: nil)).height }.max() ?? 0
+        return (count, cellWidth, height)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = max(0, proposal.width ?? (4 * minimumWidth + 3 * spacing))
+        let grid = metrics(width: width, subviews: subviews)
+        let rows = (subviews.count + grid.columns - 1) / grid.columns
+        return CGSize(width: width, height: CGFloat(rows) * grid.rowHeight + CGFloat(max(0, rows - 1)) * spacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let grid = metrics(width: bounds.width, subviews: subviews)
+        for (index, subview) in subviews.enumerated() {
+            let origin = CGPoint(x: bounds.minX + CGFloat(index % grid.columns) * (grid.cellWidth + spacing),
+                                 y: bounds.minY + CGFloat(index / grid.columns) * (grid.rowHeight + spacing))
+            subview.place(at: origin, anchor: .topLeading,
+                          proposal: ProposedViewSize(width: grid.cellWidth, height: nil))
+        }
+    }
+}
+
+// Geometry is observed without changing layout proposals or state.
+struct OverviewFramePreference: PreferenceKey {
+    static var defaultValue: [String: CGRect] { [:] }
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
+private extension View {
+    func overviewFrame(_ name: String) -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: OverviewFramePreference.self,
+                                   value: [name: proxy.frame(in: .global)])
+        })
     }
 }

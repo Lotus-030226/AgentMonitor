@@ -1,63 +1,33 @@
+// Modified by Lotus for Agent Monitor. See docs/UPSTREAM.md.
 import AppKit
 import SwiftUI
 import AgentHUDCore
 
-/// How the Sessions page lists its sessions: every session of the last seven days under its day, or only those in flight
-/// or active in the last day, without days.
-enum SessionArrangement: Hashable {
-    case day, active
-}
-
-/// The Sessions page: every session of the last seven days under the day it was last active on, a running one under
-/// today, newest first, below the totals of the sessions filed under today. Today and any day with a session still
-/// running are open; the other days fold to their totals until clicked. Sessions last active before the named days share
-/// one Earlier group. The Active arrangement drops the days: it lists the sessions active in the last day, newest
-/// activity first, below the same totals. Each session reads as it does in the phone's list.
+/// Running conversations with source, project and search filters.
 struct SessionList: View {
     let store: UsageStore
     let theme: Theme
     let source: SessionSource?
-    let activeOnly: Bool
     var project: SessionProject? = nil
     var search = ""
-    /// Days the user opened or closed against how they start.
-    @State private var flipped: Set<Date> = []
-
     var body: some View {
-        let sessions = store.listedSessions(source: source, activeOnly: activeOnly, project: project, search: search)
-        let calendar = Calendar.current, today = calendar.startOfDay(for: store.now)
-        let filedToday = Self.filedToday(sessions, store: store, today: today, calendar: calendar)
+        let sessions = store.runningSessions(source: source, project: project, search: search)
         VStack(alignment: .leading, spacing: 0) {
-            if !filedToday.isEmpty {
-                SessionsTodayCard(sessions: filedToday, store: store, theme: theme).padding(.bottom, 18)
-            }
-            if activeOnly {
-                if !sessions.isEmpty {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(L10n.text("近 24 小时", "Last 24 hours")).font(.ui(13, .semibold)).foregroundStyle(theme.text)
-                        Spacer(minLength: 8)
-                        Text(L10n.text("每轮 Token", "Tokens per turn")).font(.ui(11))
-                    }
-                    .foregroundStyle(theme.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 6)
-                    cards(sessions)
+            if !sessions.isEmpty {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(L10n.text("运行中的对话", "Running conversations"))
+                        .font(.ui(13, .semibold)).foregroundStyle(theme.text)
+                    Spacer(minLength: 8)
+                    Text(L10n.text("每轮 Token", "Tokens per turn")).font(.ui(11))
                 }
+                .foregroundStyle(theme.secondary)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 6)
+                cards(sessions)
             } else {
-                let groups = Self.groups(sessions, store: store, today: today, calendar: calendar)
-                ForEach(Array(groups.enumerated()), id: \.element.day) { index, group in
-                    let day = Self.dayState(group.day, sessions: group.sessions, today: today, store: store)
-                    let open = day.opens != flipped.contains(group.day)
-                    dayHeader(group.day, sessions: group.sessions, running: day.running, open: open, notesTurns: index == 0,
-                              today: today, calendar: calendar)
-                    if open { cards(group.sessions) }
-                }
-            }
-            if sessions.isEmpty {
-                Text(project != nil || !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                     ? L10n.text("没有匹配的会话", "No matching sessions")
-                     : activeOnly ? L10n.text("近 24 小时没有活跃的会话", "No sessions active in the last 24 hours")
-                                  : L10n.text("近 7 天没有会话", "No sessions in the last 7 days"))
+                Text(source != nil || project != nil || !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                     ? L10n.text("没有匹配的运行中对话", "No matching running conversations")
+                     : L10n.text("没有运行中的对话", "No running conversations"))
                     .font(.ui(12)).foregroundStyle(theme.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .card(theme)
@@ -73,8 +43,7 @@ struct SessionList: View {
         return days.filter { $0.day >= first } + (earlier.isEmpty ? [] : [(day: Date.distantPast, sessions: earlier)])
     }
 
-    /// The sessions the card above the list sums in either arrangement: today's group, the sessions last active today or
-    /// in flight, whenever they began.
+    /// Today's historical group remains available to usage summaries.
     static func filedToday(_ sessions: [LiveSession], store: UsageStore, today: Date, calendar: Calendar) -> [LiveSession] {
         groups(sessions, store: store, today: today, calendar: calendar).first { $0.day == today }?.sessions ?? []
     }
@@ -100,53 +69,6 @@ struct SessionList: View {
         .padding(.bottom, 18)
     }
 
-    /// The day's name and count, and while it is folded what its sessions spent; a click folds or opens it.
-    private func dayHeader(_ day: Date, sessions: [LiveSession], running: Int, open: Bool, notesTurns: Bool, today: Date,
-                           calendar: Calendar) -> some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.15)) { flipped.formSymmetricDifference([day]) }
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .rotationEffect(.degrees(open ? 90 : 0))
-                    .frame(width: 10)
-                Text(Self.title(day, today: today, calendar: calendar)).font(.ui(13, .semibold)).foregroundStyle(theme.text)
-                Text("\(sessions.count)").font(.tabular(11))
-                if running > 0 {
-                    Text(L10n.text("\(running) 个运行中", "\(running) running")).font(.ui(11)).foregroundStyle(theme.status(.ok))
-                }
-                Spacer(minLength: 8)
-                if !open {
-                    if let costs = SessionsTodayCard.costs(sessions, store: store) {
-                        Text(costs).font(.tabular(11))
-                    }
-                    let tokens = sessions.reduce(0) { $0 + store.sessionTokens($1).total }
-                    Text(tokens > 0 ? TokenFormat.short(tokens) : "—")
-                        .font(.tabular(11, .semibold)).foregroundStyle(theme.text)
-                        .frame(minWidth: 44, alignment: .trailing)
-                } else if notesTurns {
-                    Text(L10n.text("每轮 Token", "Tokens per turn")).font(.ui(11))
-                }
-            }
-            .foregroundStyle(theme.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, open ? 0 : 9)
-            .background {
-                if !open {
-                    RoundedRectangle(cornerRadius: 10).fill(theme.card)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.bottom, open ? 6 : 8)
-        .accessibilityLabel(Self.title(day, today: today, calendar: calendar))
-        .accessibilityValue(open ? L10n.text("已展开", "Expanded") : L10n.text("已折叠", "Collapsed"))
-    }
-
-    /// Today, yesterday, then the weekday and date; Earlier for the sessions last active before the named days.
     static func title(_ day: Date, today: Date, calendar: Calendar) -> String {
         if day == today { return L10n.text("今天", "Today") }
         if day == calendar.date(byAdding: .day, value: -1, to: today) { return L10n.text("昨天", "Yesterday") }
@@ -400,6 +322,20 @@ struct TurnSparkline: View {
 }
 
 extension UsageStore {
+    /// App presentation keeps only verified work in flight. History and token totals remain unchanged.
+    func runningSessions(source: SessionSource? = nil, project: SessionProject? = nil, search: String = "") -> [LiveSession] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return view.sessions.filter { shown in
+            let session = shown.session
+            guard !session.accountWide, shown.phase.isInFlight,
+                  source == nil || shown.source == source,
+                  project == nil || SessionProject(session) == project else { return false }
+            return query.isEmpty || [session.task, session.workingDirectory, session.displayPath, SessionProject(session).label,
+                                     shown.source.name, consumerName(session.agentId)]
+                .compactMap { $0 }.contains { $0.localizedStandardContains(query) }
+        }.map(\.session)
+    }
+
     /// The list's sessions, from one source or all: the last seven days', or with `activeOnly`, the Active arrangement,
     /// those running or active in the last day. Newest activity first.
     func listedSessions(source: SessionSource?, activeOnly: Bool, project: SessionProject? = nil, search: String = "") -> [LiveSession] {

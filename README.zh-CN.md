@@ -8,14 +8,16 @@
 
 [English](README.md) · [繁體中文](README.zh-TW.md) · **简体中文**
 
-[下载最新版本](https://github.com/Lotus-030226/AgentMonitor/releases/latest) · [1.0.0 Apple Silicon 安装包](https://github.com/Lotus-030226/AgentMonitor/releases/download/v1.0.0/AgentMonitor-1.0.0-macOS-arm64.zip)
+[下载最新版本](https://github.com/Lotus-030226/AgentMonitor/releases/latest) · [1.1.0 Apple Silicon 安装包](https://github.com/Lotus-030226/AgentMonitor/releases/download/v1.1.0/AgentMonitor-1.1.0-macOS-arm64.zip)
 
 ## 功能
 
-- **Agent 活动：** 查看支持客户端的额度、Token 用量、会话状态与 CLI／Desktop 来源，包括 Claude Code 与 Codex。可用数据因客户端与账户而异。
-- **悬浮 HUD：** 一次显示两个 Agent，其余向下滚动；本机摘要保持可见。悬停于 Docker 摘要可预览容器名称、镜像与状态。
+- **Agent 活动：** 查看支持客户端的额度、Token 用量、对话状态与 CLI／Desktop 来源，包括 Claude Code 与 Codex。可用数据因客户端与账户而异。
+- **进行中对话：** 对话列表只显示进行中的工作，包含等待批准的请求；已完成的对话保留在本机历史记录。
+- **悬浮 HUD：** 一次显示两个 Agent，其余向下滚动；本机摘要随 HUD 宽度调整，最多显示四列。悬停于 Docker 摘要可预览容器名称、镜像与状态。
+- **总览：** 成对卡片使用相同宽度与高度，标题与图表底部对齐。
 - **系统状态：** 查看 CPU、内存压力、存储空间、网络流量、电池与热状态，以及高资源用量进程。
-- **六个页面：** 在同一窗口切换总览、进程、Docker、本机服务、Token 与会话。
+- **六个页面：** 在同一窗口切换总览、进程、Docker、本机服务、Token 与对话。
 - **本机服务：** 查看 TCP 监听端口，包含 Docker 以外的服务。支持搜索、暂停与手动刷新，每 10 秒采样。选择 HTTP 或 HTTPS 才会打开服务，不会自动探测网站。
 - **可选客户端 hooks：** 在 HUD 回应支持的批准请求。每次都需要明确选择允许一次或拒绝。
 
@@ -23,7 +25,7 @@
 
 需要 **macOS 14 或更高版本**。目前下载包支持 **Apple Silicon（arm64）**。
 
-1. 从版本页下载 `AgentMonitor-1.0.0-macOS-arm64.zip`。
+1. 从版本页下载 `AgentMonitor-1.1.0-macOS-arm64.zip`。
 2. 解压后，将 **Agent Monitor.app** 拖入“应用程序”。
 3. 从“应用程序”打开 App。
 
@@ -40,7 +42,7 @@ App 使用 ad-hoc 签名，没有 Developer ID 证书，也未经过 Apple 公�
 | `⌘⌥H` | 显示或隐藏主 HUD |
 | `⌘Q` | 退出 App |
 
-请在各提供商已安装的客户端登录。Agent Monitor 使用现有本机账户，没有独立账户或凭证输入界面。Claude Code 可先运行 `claude auth login`，再用 `claude auth status` 检查，最后回到 Agent Monitor 设置刷新。即使额度无法获取，仍可能显示会话活动。
+请在各提供商已安装的客户端登录。Agent Monitor 使用现有本机账户，没有独立账户或凭证输入界面。Claude Code 可先运行 `claude auth login`，再用 `claude auth status` 检查，最后回到 Agent Monitor 设置刷新。即使额度无法获取，仍可能显示对话活动。
 
 首次启动默认关闭客户端 hooks 与登录时启动。需要时，在“设置 → 通用 → Client hooks”启用；各客户端的支持范围不同。
 
@@ -54,7 +56,7 @@ App 使用 ad-hoc 签名，没有 Developer ID 证书，也未经过 Apple 公�
 
 更新时，先退出 Agent Monitor，解压新 ZIP，再替换“应用程序”内的 **Agent Monitor.app**。原有偏好设置会保留。
 
-检查使用此仓库的官方 GitHub API，不使用提供商凭证、Cookie 或认证信息。GitHub 会收到 IP 地址与客户端请求头等一般连接信息，不会收到会话内容或系统读数。详见[更新数据访问](docs/data-access.md#update-checks)。
+检查使用此仓库的官方 GitHub API，不使用提供商凭证、Cookie 或认证信息。GitHub 会收到 IP 地址与客户端请求头等一般连接信息，不会收到对话内容或系统读数。详见[更新数据访问](docs/data-access.md#update-checks)。
 
 ## 从源码构建
 

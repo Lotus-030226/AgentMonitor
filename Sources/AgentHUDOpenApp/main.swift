@@ -108,12 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let controller = LocalMonitorController(store: localStore)
         self.localStore = localStore
         self.localController = controller
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.0"
         // This fixture applies only to demo launches. Production ignores the flag.
         let demoUpdate: UpdateCheckState = options.demo && arguments.contains("--demo-update-available")
-            ? .available(UpdateRelease(version: "1.1.0",
-                pageURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/tag/v1.1.0")!,
-                downloadURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/download/v1.1.0/AgentMonitor-1.1.0-macOS-arm64.zip")!))
+            ? .available(UpdateRelease(version: "1.2.0",
+                pageURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/tag/v1.2.0")!,
+                downloadURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/download/v1.2.0/AgentMonitor-1.2.0-macOS-arm64.zip")!))
             : .idle
         let updates = options.demo
             ? AppUpdateStore(currentVersion: version, defaults: defaults,

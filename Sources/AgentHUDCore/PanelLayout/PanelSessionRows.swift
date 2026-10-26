@@ -100,11 +100,11 @@ public extension ReportView {
     /// - project: the project a session belongs to, asked for only where the filter names projects; a host passes the
     ///   one it keeps for the report (`UsageStore.panelSessions(_:vendor:)`), since finding one reads Git's pointers.
     func panelSessions(_ filter: PanelSessionFilter = PanelSessionFilter(), vendor: String? = nil,
-                       source: SessionSource? = nil, project: (LiveSession) -> SessionProject = SessionProject.init) -> PanelSessionRows {
+                       source: SessionSource? = nil, runningOnly: Bool = false, project: (LiveSession) -> SessionProject = SessionProject.init) -> PanelSessionRows {
         let mark = vendor.map(VendorMark.key)
         let listed = now.addingTimeInterval(-filter.period.duration)
         let own = sessions.filter { !$0.session.accountWide && (mark == nil || $0.markVendor.map(VendorMark.key) == mark) }
-        let window = own.filter { $0.phase.isInFlight || $0.lastEventAt >= listed }
+        let window = own.filter { runningOnly ? $0.phase.isInFlight : ($0.phase.isInFlight || $0.lastEventAt >= listed) }
         var counts: [PanelSessionState: Int] = [:]
         for session in window { counts[PanelSessionState(session.phase.state), default: 0] += 1 }
         let matching = window.filter { session in
@@ -171,10 +171,11 @@ public struct PanelSessionActivityGroup: Sendable {
 
 public extension ReportView {
     /// Uses recorded phases only. An open application does not establish session activity.
-    func panelSessionActivityGroups(vendor: String? = nil) -> [PanelSessionActivityGroup] {
+    func panelSessionActivityGroups(vendor: String? = nil, runningOnly: Bool = false) -> [PanelSessionActivityGroup] {
         let mark = vendor.map(VendorMark.key)
         let recent = sessions.filter {
-            !$0.session.accountWide && $0.liveStatus && $0.lastEventAt >= now.addingTimeInterval(-86400)
+            !$0.session.accountWide && $0.liveStatus
+                && (runningOnly ? $0.phase.isInFlight : $0.lastEventAt >= now.addingTimeInterval(-86400))
                 && (mark == nil || $0.markVendor.map(VendorMark.key) == mark)
         }
         let grouped = Dictionary(grouping: recent.filter { $0.markVendor != nil }, by: { $0.markVendor! })

@@ -93,7 +93,7 @@ extension HoverPanelView {
         }
         let visible = Set(lines.flatMap(\.blocks).map(\.vendorGroup))
         let layout = store.settings.panelLayout.effective(for: screen)
-        let available = store.view.panelSessionActivityGroups(vendor: focusVendor).filter { group in
+        let available = store.view.panelSessionActivityGroups(vendor: focusVendor, runningOnly: true).filter { group in
             !visible.contains(AgentArtwork.markKey(group.vendor))
                 && !layout.blocks.contains { key, block in
                     block.hidden == true && AgentArtwork.markKey(key) == AgentArtwork.markKey(group.vendor)
