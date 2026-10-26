@@ -46,6 +46,16 @@ Client hooks and launch at login are off on first launch. Enable hooks under **S
 
 Local monitoring reads system state. It does not control services or containers. Agent providers can use existing client credentials to query remote usage. See [data access](docs/data-access.md) for sources, requests, and storage. Unavailable readings show an unknown or unavailable state.
 
+## Updates
+
+Choose **Agent Monitor → Check for Updates…** or use **Settings → General** to check manually. Automatic checks are enabled by default. The app checks at startup, at most once every 24 hours. Turn automatic checks off in General if needed.
+
+A newer stable release appears in Settings and the expanded HUD. Open its release page or download its ZIP when ready. Downloads start only after your click. The app does not install updates or replace itself.
+
+To update, quit Agent Monitor, extract the new ZIP, and replace **Agent Monitor.app** in Applications. Your preferences stay in place.
+
+Checks use the official GitHub API for this repository. They use no provider credentials, cookies, or authentication. GitHub receives normal network information, including your IP address and client headers. No session content or system readings are sent. See [update data access](docs/data-access.md#update-checks).
+
 ## Build from source
 
 Use macOS 14 or later and Xcode with Swift 6 support. Run these commands from the repository folder:

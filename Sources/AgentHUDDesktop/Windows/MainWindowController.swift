@@ -64,7 +64,7 @@ public final class MainWindowController {
     public init(settings: SettingsStore, store: UsageStore, demo: Bool = false,
                 localContent: @escaping (MainWindowPage) -> AnyView,
                 additionalSettingsPages: [DesktopSettingsPage] = [],
-                experimentalSettings: [DesktopSettingsSection] = []) {
+                experimentalSettings: [DesktopSettingsSection] = [], updates: AppUpdateStore? = nil) {
         self.store = store
         settingsPageIDs = Set(SettingsTab.allCases.map(\.id) + additionalSettingsPages.map(\.id))
         let screen = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1100, height: 800)
@@ -77,7 +77,7 @@ public final class MainWindowController {
             run: { _, _ in MCPCommandResult(status: nil, output: "Demo mode") }, copy: { _ in }
         )) : nil
         host.setContent(MainWindowView(settings: settings, store: store, navigation: navigation,
-                                       sourceStatuses: demo ? DemoData.sources : nil, clientSetup: clientSetup,
+                                       sourceStatuses: demo ? DemoData.sources : nil, clientSetup: clientSetup, updates: updates,
                                        localContent: localContent, additionalSettingsPages: additionalSettingsPages,
                                        experimentalSettings: experimentalSettings))
         host.refreshLook()
@@ -100,6 +100,7 @@ private struct MainWindowView: View {
     @Bindable var navigation: MainWindowNavigation
     let sourceStatuses: [SourceStatus]?
     let clientSetup: MCPClientSetup?
+    let updates: AppUpdateStore?
     let localContent: (MainWindowPage) -> AnyView
     let additionalSettingsPages: [DesktopSettingsPage]
     let experimentalSettings: [DesktopSettingsSection]
@@ -127,7 +128,7 @@ private struct MainWindowView: View {
                     .mainPageVisible(navigation.page == .tokens || navigation.page == .sessions)
                 SettingsView(settings: settings, store: store, navigation: navigation.settings, embedded: true,
                              additionalPages: additionalSettingsPages, experimentalSections: experimentalSettings,
-                             clientSetup: clientSetup, sourceStatuses: sourceStatuses)
+                             clientSetup: clientSetup, sourceStatuses: sourceStatuses, updates: updates)
                     .mainPageVisible(navigation.page == .settings)
             }
             .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)

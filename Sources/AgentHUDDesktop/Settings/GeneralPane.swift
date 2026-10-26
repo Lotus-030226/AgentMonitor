@@ -5,9 +5,11 @@ import AgentHUDCore
 struct GeneralPane: View {
     let settings: SettingsStore
     let theme: Theme
+    var updates: AppUpdateStore? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
+            if let updates { UpdateSettingsSection(updates: updates) }
             SettingsSection(title: L10n.text("外观与语言", "Appearance & language"), theme: theme) {
                 SettingRow(label: L10n.text("外观", "Appearance")) {
                     Picker(L10n.text("外观", "Appearance"), selection: settings.binding(\.appearance)) {

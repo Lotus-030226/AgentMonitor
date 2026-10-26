@@ -7,7 +7,7 @@ import LocalMonitorUI
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var desktop: DesktopApplication?
     private var localStore: LocalMonitorStore?
     private var localController: LocalMonitorController?
@@ -108,6 +108,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = LocalMonitorController(store: localStore)
         self.localStore = localStore
         self.localController = controller
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        // This fixture applies only to demo launches. Production ignores the flag.
+        let demoUpdate: UpdateCheckState = options.demo && arguments.contains("--demo-update-available")
+            ? .available(UpdateRelease(version: "1.1.0",
+                pageURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/tag/v1.1.0")!,
+                downloadURL: URL(string: "https://github.com/Lotus-030226/AgentMonitor/releases/download/v1.1.0/AgentMonitor-1.1.0-macOS-arm64.zip")!))
+            : .idle
+        let updates = options.demo
+            ? AppUpdateStore(currentVersion: version, defaults: defaults,
+                             client: DisabledUpdateReleaseClient(), initialState: demoUpdate)
+            : AppUpdateStore(currentVersion: version, defaults: defaults)
         let desktop = DesktopApplication(options: options, settings: settings, store: store,
             localContent: { page in
                 switch page {
@@ -119,11 +130,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             additionalHUDControls: { collapse in
-                AnyView(LocalMonitorHUDSummary(store: localStore) {
-                    collapse()
-                    controller.showDetails()
+                AnyView(VStack(spacing: 10) {
+                    LocalMonitorHUDSummary(store: localStore) {
+                        collapse()
+                        controller.showDetails()
+                    }
+                    UpdateNotice(updates: updates)
                 })
-            }, maxVisibleAgentGroups: 2)
+            }, maxVisibleAgentGroups: 2, updates: updates)
         self.desktop = desktop
         controller.onShowDetails = { [weak desktop] in desktop?.showMain(.overview) }
         installMainMenu()
@@ -139,6 +153,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = NSMenuItem(title: "設定…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         appMenu.addItem(settings)
+        let updates = NSMenuItem(title: L10n.text("检查更新…", "Check for Updates…"),
+                                 action: #selector(checkForUpdates), keyEquivalent: "")
+        updates.target = self
+        appMenu.addItem(updates)
         appMenu.addItem(.separator())
         let quit = NSMenuItem(title: "結束 Agent Monitor", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
@@ -157,7 +175,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.windowsMenu = windowMenu
     }
 
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(checkForUpdates) {
+            return desktop?.updates.state != .checking
+        }
+        return true
+    }
+
     @objc private func showSettings() { desktop?.showSettings() }
+
+    @objc private func checkForUpdates() {
+        Task { await desktop?.checkForUpdates() }
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         desktop?.reopen()

@@ -37,3 +37,7 @@ Local changes to inherited code:
 
 - Remove the production status item. Keep the floating HUD and native app-menu routes.
 - Reopening the app brings the shared overview window forward.
+
+- Add manual update checks in the app menu and shared General settings, plus notices in Settings and the expanded HUD.
+- Add optional automatic checks, at most once every 24 hours, against this project's stable GitHub releases.
+- Keep downloads user-initiated. Do not use Sparkle or an upstream update feed.

@@ -8,6 +8,7 @@ import SwiftUI
 public final class DesktopApplication {
     public let settings: SettingsStore
     public let store: UsageStore
+    public let updates: AppUpdateStore
     private let options: DesktopLaunchOptions
     private let additionalSettingsPages: [DesktopSettingsPage]
     private let experimentalSettings: [DesktopSettingsSection]
@@ -38,7 +39,7 @@ public final class DesktopApplication {
     private let localContent: (MainWindowPage) -> AnyView
     public private(set) lazy var mainWindow = MainWindowController(
         settings: settings, store: store, demo: options.demo, localContent: localContent,
-        additionalSettingsPages: additionalSettingsPages, experimentalSettings: experimentalSettings
+        additionalSettingsPages: additionalSettingsPages, experimentalSettings: experimentalSettings, updates: updates
     )
     private let onboardingWindow: OnboardingWindowController
 
@@ -51,11 +52,20 @@ public final class DesktopApplication {
                 experimentalSettings: [DesktopSettingsSection] = [],
                 additionalHUDControls: @escaping @MainActor (@escaping @MainActor () -> Void) -> AnyView = { _ in AnyView(EmptyView()) },
                 maxVisibleAgentGroups: Int? = nil,
-                onIslandEvents: ((IslandEventTracker.Update, UsageReport, Date) -> Void)? = nil) {
+                onIslandEvents: ((IslandEventTracker.Update, UsageReport, Date) -> Void)? = nil,
+                updates: AppUpdateStore? = nil) {
         self.localContent = localContent
         self.options = options
         self.settings = settings
         self.store = store
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        if let updates {
+            self.updates = updates
+        } else if options.demo || options.probe || options.snapshotDirectory != nil {
+            self.updates = AppUpdateStore(currentVersion: version, client: DisabledUpdateReleaseClient())
+        } else {
+            self.updates = AppUpdateStore(currentVersion: version)
+        }
         self.additionalSettingsPages = additionalSettingsPages
         self.experimentalSettings = experimentalSettings
         self.additionalHUDControls = additionalHUDControls
@@ -73,6 +83,7 @@ public final class DesktopApplication {
     }
 
     public func start() {
+        if !options.demo, !options.probe, options.snapshotDirectory == nil { updates.start() }
         let sources = options.demo ? DemoData.sources : SourceDetector.resolve(SourceDetector.detect(), report: store.report)
         settings.update { $0.applyLiveStatusDefaults(sources: sources) }
         WindowLook.source = { [weak self] screen in self?.settings.windowLook(on: screen) }
@@ -210,6 +221,7 @@ public final class DesktopApplication {
     }
 
     public func stop() {
+        updates.stop()
         antigravityApprovals.stop()
         deepseekQuestions.stop()
         codexDesktopApprovals.stop()
@@ -266,6 +278,11 @@ public final class DesktopApplication {
         // A request that only joined or left the queue changes no card, but it does change how many are waiting.
         notch?.apply(animated: true)
     }
+    public func checkForUpdates() async {
+        showSettings(pageID: "general")
+        await updates.checkNow()
+    }
+
     public func showSettings(pageID: String? = nil) { mainWindow.show(.settings, settingsPageID: pageID) }
     public func showMain(_ page: MainWindowPage = .overview) { mainWindow.show(page) }
     /// Restores the main window when Finder reopens the running app.

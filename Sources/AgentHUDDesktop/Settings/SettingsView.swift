@@ -66,6 +66,7 @@ struct SettingsView: View {
     var embedded = false
     let settings: SettingsStore
     let store: UsageStore
+    let updates: AppUpdateStore?
     var sourceStatuses: [SourceStatus]?
     var initialProviderID: String?
     let additionalPages: [DesktopSettingsPage]
@@ -82,10 +83,12 @@ struct SettingsView: View {
          additionalPages: [DesktopSettingsPage] = [],
          experimentalSections: [DesktopSettingsSection] = [],
          clientSetup: MCPClientSetup? = nil,
-         sourceStatuses: [SourceStatus]? = nil, initialProviderID: String? = nil) {
+         sourceStatuses: [SourceStatus]? = nil, initialProviderID: String? = nil,
+         updates: AppUpdateStore? = nil) {
         self.embedded = embedded
         self.settings = settings
         self.store = store
+        self.updates = updates
         self.sourceStatuses = sourceStatuses
         self.initialProviderID = initialProviderID
         let builtIn = Set(SettingsTab.allCases.map(\.id))
@@ -165,7 +168,7 @@ struct SettingsView: View {
     private func pane(_ theme: Theme) -> some View {
         if let tab {
             switch tab {
-            case .general: GeneralPane(settings: settings, theme: theme)
+            case .general: GeneralPane(settings: settings, theme: theme, updates: updates)
             case .sources: SourcesPane(settings: settings, store: store, theme: theme, sources: sourceStatuses,
                                        initialProviderID: initialProviderID)
             case .display: DisplayPane(settings: settings, store: store, theme: theme)

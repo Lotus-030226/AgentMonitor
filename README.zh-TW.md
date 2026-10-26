@@ -42,9 +42,19 @@ App 使用 ad-hoc 簽署，沒有 Developer ID 憑證，也未經 Apple 公證�
 
 請在各供應者已安裝的客戶端登入。Agent Monitor 使用既有本機帳戶，沒有獨立帳戶或憑證輸入畫面。Claude Code 可先執行 `claude auth login`，再以 `claude auth status` 檢查，最後回到 Agent Monitor 設定重新整理。即使額度無法取得，仍可能顯示會話活動。
 
-首次啟動預設關閉客戶端 hooks 與登入時啟動。需要時，在「設定 → 一般 → Client hooks」啟用；各客戶端的支援範圍不同。
+首次啟動預設關閉客戶端 hooks 與登入時啟動。需要時，在「設定 → 通用 → Client hooks」啟用；各客戶端的支援範圍不同。
 
 本機監控只讀取系統狀態，不控制服務或容器。Agent 用量供應者可能使用客戶端既有憑證查詢遠端用量。資料來源、請求與儲存方式見[資料存取說明](docs/data-access.md)。無法取得的讀數會標示為未知或無法使用。
+
+## 更新
+
+在「Agent Monitor → 檢查更新…」或「設定 → 通用」手動檢查。自動檢查預設開啟：啟動時檢查，每 24 小時最多一次。需要時可在「通用」關閉自動檢查。
+
+有較新的穩定版本時，設定與展開的 HUD 會顯示通知。你可以開啟版本頁或下載 ZIP；點擊後才會開始下載。App 不會自動安裝或取代自身。
+
+更新時，先結束 Agent Monitor，解壓縮新 ZIP，再取代「應用程式」內的 **Agent Monitor.app**。原有偏好設定會保留。
+
+檢查使用此儲存庫的官方 GitHub API，不使用供應者憑證、Cookie 或驗證資訊。GitHub 會收到 IP 位址與客戶端標頭等一般連線資訊，不會收到會話內容或系統讀數。詳見[更新資料存取](docs/data-access.md#update-checks)。
 
 ## 從原始碼建置
 

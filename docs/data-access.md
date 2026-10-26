@@ -4,6 +4,24 @@
 
 Agent HUD Open reads agent activity and usage metadata on your Mac. It has no Agent HUD account, cloud synchronization or push service. Building it requires no developer account, product credential, provisioning profile or signing certificate; local builds use ad-hoc signing.
 
+## Update checks
+
+Agent Monitor checks the latest stable release of `Lotus-030226/AgentMonitor` through the official GitHub API:
+
+`https://api.github.com/repos/Lotus-030226/AgentMonitor/releases/latest`
+
+- Automatic checks are on by default. At startup, a check runs only if the last attempt was at least 24 hours ago.
+- Settings → General can disable automatic checks. Manual checks remain available there and in the app menu.
+- Checks use an ephemeral URLSession without cookies or an Authorization header. They read no provider credentials.
+- GitHub receives the repository request, the client's IP address, and normal client headers.
+- Checks send no session content, transcripts, machine metrics, or credentials.
+- Version comparison rejects prereleases. A missing published release appears separately from a connection or response error.
+- A newer stable release adds a notice in Settings and the expanded HUD. The notice does not open a browser automatically.
+- The release page or ZIP opens only after a user clicks its action. The app does not install or replace itself.
+- Replacing the app bundle after quitting retains preferences. Automatic-check preferences and check times stay on the Mac.
+- UserDefaults also caches a known newer release's version, page URL, and download URL. Restored URLs are validated.
+- Cached release metadata keeps the notice visible after restart or while offline. Upgrading to that version clears the cache.
+
 ## Providers
 
 | Client | Local data | Quota or balance queries |
